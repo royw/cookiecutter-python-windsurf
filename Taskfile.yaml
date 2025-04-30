@@ -1,0 +1,40 @@
+version: '3'
+
+vars:
+  PYTHON: python3
+  PROJECT_DIR: /home/royw/src/cookiecutter-python-windsurf
+  VENV_DIR: .venv
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task -l
+
+  init:
+    internal: true
+    cmds:
+      - rm -rf .venv
+      - uv venv
+      - sh -c '. .venv/bin/activate && uv pip install cookiecutter'
+
+  test:
+    desc: Test the cookiecutter template by creating a FooBar project
+    cmds:
+      - task: clean
+      - task: init
+      - sh -c '. .venv/bin/activate && cookiecutter . -o ~/tmp --no-input project_name="FooBar" project_slug="foobar" package_name="foobar" project_short_description="A test FooBar project" full_name="Test User" github_username="testuser" version="0.1.0" python_version="3.11"'
+
+  clean:
+    desc: Clean testing artifacts
+    cmds:
+      - rm -rf ~/tmp/foobar
+      - rm -rf .venv
+      - find . -type d -name __pycache__ -exec rm -rf {} +
+      - find . -type f -name '*.pyc' -delete
+      - find . -type f -name '*.pyo' -delete
+      - find . -type f -name '*.pyd' -delete
+      - find . -type f -name '.coverage' -delete
+      - find . -type d -name '.pytest_cache' -exec rm -rf {} +
+      - find . -type d -name '.mypy_cache' -exec rm -rf {} +
+      - find . -type d -name '.ruff_cache' -exec rm -rf {} +

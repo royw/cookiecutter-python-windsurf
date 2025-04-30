@@ -1,0 +1,10 @@
+{
+    "project_name": "My Python Project",
+    "project_slug": "{{ cookiecutter.project_name.lower().replace(' ', '-') }}",
+    "package_name": "{{ cookiecutter.project_slug.replace('-', '_') }}",
+    "project_short_description": "A Python project using mkdocs and mkdocstrings",
+    "full_name": "Your Name",
+    "github_username": "yourusername",
+    "version": "0.1.0",
+    "python_version": "3.11"
+}
