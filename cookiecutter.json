@@ -6,5 +6,6 @@
     "full_name": "Your Name",
     "github_username": "yourusername",
     "version": "0.1.0",
-    "python_version": "3.11"
+    "python_version": "3.11",
+    "_copy_without_render": ["Taskfile.yaml"]
 }

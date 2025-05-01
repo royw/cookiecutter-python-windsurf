@@ -22,6 +22,23 @@ require_pre_commit = true
 require_task_automation = true
 use_taskfile = true  # Use tasks defined in Taskfile.yaml (e.g., "task lint", "task test")
 
+# Design Practices
+prefer_design_patterns = true  # Use established design patterns where applicable
+design_patterns = [
+    "factory",      # For object creation
+    "strategy",     # For interchangeable algorithms
+    "observer",     # For event handling
+    "repository",   # For data access
+    "dependency_injection"  # For loose coupling
+]
+document_patterns = true  # Document which patterns are used and why
+pattern_threshold = "3+"  # Apply patterns when similar code appears 3+ times
+
+# Test-Driven Development
+require_tests_first = true  # Write tests before implementing features
+test_commit_order = true   # Tests must be committed before or with implementation
+test_naming = "test_${feature}_${scenario}"  # Naming convention for test files/functions
+
 # Code Review Standards
 max_file_changes = 500
 require_tests = true
