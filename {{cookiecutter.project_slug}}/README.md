@@ -24,54 +24,88 @@ task setup
 ```
 
 This will:
-1. Create a virtual environment
-2. Install the package in editable mode with development dependencies
-3. Set up pre-commit hooks
+1. Install required Python versions (3.11, 3.12, 3.13)
+2. Create virtual environments for each Python version
+3. Install the package in editable mode with development and documentation dependencies
+4. Set up pre-commit hooks
+5. Create a symlink from `.venv` to the development Python version (3.12)
 
 ### Available Tasks
 
+#### Environment Management
+- `task setup` - Set up development environments for all supported Python versions
+- `task update:env` - Update all virtual environments with latest dependencies
+- `task update:dev-env` - Update only development environment
+- `task upgrade-env` - Upgrade all dependencies to latest versions
+- `task clean` - Clean build artifacts and caches
+
+#### Testing
+- `task test` - Run tests using development Python version
+- `task test:coverage` - Run tests with coverage report
+- `task test:pythons` - Run tests across all supported Python versions
+
+#### Code Quality
+- `task lint` - Run code quality checks (ruff, mypy, pre-commit)
 - `task format` - Format code with ruff
-- `task lint` - Run linters (ruff)
-- `task typecheck` - Run type checking with mypy
-- `task test` - Run tests with pytest
-- `task docs` - Build and serve documentation
-- `task check` - Run all checks (format, lint, typecheck, test)
+- `task metrics` - Run code quality metrics (radon)
+- `task spell` - Run codespell checks
+
+#### Documentation
+- `task docs` - Serve documentation locally
+- `task docs:build` - Build documentation
+
+#### Build and Publish
+- `task build` - Build package distribution (wheel and sdist)
+- `task publish:pypi` - Publish to PyPI
+- `task publish:test-pypi` - Publish to Test PyPI
+
+#### CI/CD
+- `task ci` - Run all CI checks (lint, test, coverage, docs, build)
+
+Run `task --list-all` to see all available tasks with descriptions.
 
 ### Continuous Integration
 
 GitHub Actions will automatically:
-- Run tests and upload coverage to Codecov
-- Run type checking
+- Run tests across all supported Python versions
+- Upload coverage reports to Codecov
+- Run code quality checks (ruff, mypy)
+- Run security checks (bandit)
 - Build and test documentation
 - Deploy documentation to GitHub Pages (on main branch)
+- Publish package to PyPI (on release)
 
 ### Publishing to PyPI
 
 To publish a new version:
 
-1. Update the version in `pyproject.toml`:
-   ```toml
-   [project]
-   version = "x.y.z"
-   ```
-
-2. Create and push a new tag:
+1. Update the version using the version bump task:
    ```bash
-   git tag vx.y.z
-   git push origin vx.y.z
+   task version:bump -- patch  # For patch version (0.0.x)
+   task version:bump -- minor  # For minor version (0.x.0)
+   task version:bump -- major  # For major version (x.0.0)
    ```
 
-3. Create a new release on GitHub:
-   - Go to Releases -> Draft a new release
-   - Choose the tag you just pushed
-   - Title it "vx.y.z"
-   - Describe the changes
-   - Publish the release
+2. Create and push a tag (automated):
+   ```bash
+   task version:tag
+   ```
 
-The release workflow will automatically:
-- Build the package
-- Upload it to PyPI
-- Create a new documentation version
+3. Publish to Test PyPI first:
+   ```bash
+   task publish:test-pypi
+   ```
+
+4. Verify the package on Test PyPI, then publish to PyPI:
+   ```bash
+   task publish:pypi
+   ```
+
+The CI/CD workflow will automatically:
+- Run all checks (lint, test, coverage)
+- Build and verify the package
+- Build and deploy documentation
+- Create a GitHub release
 
 ## Documentation
 

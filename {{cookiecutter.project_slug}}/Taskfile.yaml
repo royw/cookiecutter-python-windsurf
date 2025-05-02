@@ -8,36 +8,37 @@
 # - DEV_VERSION (3.12) is the primary development version
 # - Virtual environments are created for each version (.venv-3.11, .venv-3.12, .venv-3.13)
 # - .venv symlink points to the development version's environment
-# - tasks should always use .venv/bin/python except when managing the environment
+# - Tasks should always use .venv/bin/python except when managing environments
 #
 # Environment:
-# - task setup: Set up development environment (creates all version environments)
-# - task update-env: Update virtual environments with latest dependencies
-# - task clean: Clean build artifacts
-# - task clean:venvs: Remove all virtual environments
+# - task setup: Set up development environments (creates all Python version environments)
+# - task update:env: Update all virtual environments with latest dependencies
+# - task update:dev-env: Update only development environment
+# - task upgrade-env: Upgrade all dependencies to latest versions
+# - task clean: Clean build artifacts and caches
 #
 # Testing:
 # - task test: Run tests using development Python version
-# - task test:coverage: Run tests with coverage report using development Python version
-# - task test:pythons: Run tests and checks () across all Python versions
+# - task test:coverage: Run tests with coverage report
+# - task test:pythons: Run tests across all supported Python versions
 #
-# Code quality:
+# Code Quality:
 # - task lint: Run code quality checks (ruff, mypy, pre-commit)
 # - task format: Format code with ruff
-# - task metrics: Run code quality metrics
-# - task hooks: Run pre-commit hooks
+# - task metrics: Run code quality metrics (radon)
+# - task spell: Run codespell checks
 #
 # Documentation:
 # - task docs: Serve documentation locally
 # - task docs:build: Build documentation
 #
-# Build:
-# - task build: Build package distribution
-# - task build:wheel: Build wheel distribution
-# - task build:sdist: Build source distribution
+# Build and Publish:
+# - task build: Build package distribution (wheel and sdist)
+# - task publish:pypi: Publish to PyPI
+# - task publish:test-pypi: Publish to Test PyPI
 #
 # CI/CD:
-# - task ci: Run all CI checks (lint, test, docs)
+# - task ci: Run all CI checks (lint, test, coverage, docs, build)
 
 version: '3'
 
