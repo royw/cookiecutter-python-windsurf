@@ -1,29 +1,31 @@
 """Tests for the example module."""
 
 import pytest
+from contextlib import suppress
 
-try:
-    from {{ cookiecutter.package_name }}.example import Example  # noqa
-except ImportError:
-    pass  # This will be replaced during project generation
+# Constants
+TEST_VALUE = 42
+HALF_TEST_VALUE = 21
+
+from {{cookiecutter.package_name}}.example import Example, InvalidValueError  # noqa: E402
 
 
-def test_example_initialization():
+def test_example_initialization() -> None:
     """Test Example class initialization."""
-    example = Example("test", 42)
+    example = Example("test", TEST_VALUE)
     assert example.name == "test"
-    assert example.value == 42
+    assert example.value == TEST_VALUE
 
 
-def test_example_process():
+def test_example_process() -> None:
     """Test Example.process method."""
-    example = Example("test", 21)
+    example = Example("test", HALF_TEST_VALUE)
     result = example.process()
-    assert result == 42
+    assert result == TEST_VALUE
 
 
-def test_example_process_invalid():
+def test_example_process_invalid() -> None:
     """Test Example.process method with invalid value."""
     example = Example("test", None)
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidValueError):
         example.process()

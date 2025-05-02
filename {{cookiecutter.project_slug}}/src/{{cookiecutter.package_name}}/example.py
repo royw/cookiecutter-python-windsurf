@@ -7,6 +7,14 @@ using Google style and mkdocstrings.
 from typing import Any
 
 
+class InvalidValueError(ValueError):
+    """Raised when a value is invalid."""
+
+    def __init__(self) -> None:
+        """Initialize the error with a standard message."""
+        super().__init__("Invalid value")
+
+
 class Example:
     """A class to demonstrate docstring formatting.
 
@@ -46,5 +54,9 @@ class Example:
             ValueError: If the value is invalid
         """
         if not self.value:
-            raise ValueError("Invalid value")
+            raise InvalidValueError
         return self.value * 2
+
+if __name__ == "__main__":
+    example = Example("test", 42)
+    print(example.process())  # noqa: T201

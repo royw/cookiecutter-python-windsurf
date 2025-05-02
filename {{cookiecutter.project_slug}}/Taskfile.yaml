@@ -109,7 +109,7 @@ tasks:
     cmds:
       - echo "Setting up Python {{.VERSION}} environment"
       - uv venv --python-preference managed --python {{.VERSION}} .venv-{{.VERSION}}
-      - uv pip install --python .venv-{{.VERSION}}/bin/python -e ".[dev]"
+      - uv pip install --python .venv-{{.VERSION}}/bin/python -e ".[dev,docs]"
 
   update:env:
     desc: Update virtual environment with latest dependencies
@@ -126,6 +126,26 @@ tasks:
           VERSION: "{{.ITEM}}"
       - pre-commit install
 
+  update:env:venv:
+    internal: true
+    cmds:
+      - echo "Updating Python {{.VERSION}} environment"
+      - uv pip install --python .venv-{{.VERSION}}/bin/python --upgrade pip
+      - uv pip install --python .venv-{{.VERSION}}/bin/python --upgrade -e ".[dev,docs]"
+
+  update:dev-env:
+    desc: Update development environment with latest dependencies
+    summary: |
+      Update development environment with latest dependencies
+
+      Examples:
+        # Update only the development environment (Python {{.DEV_VERSION}})
+        task update:dev-env
+    cmds:
+      - task: update:env:venv
+        vars:
+          VERSION: "{{.DEV_VERSION}}"
+
   upgrade-env:
     desc: Upgrade all dependencies to latest versions
     summary: |
@@ -140,27 +160,7 @@ tasks:
         # 2. Update all Python environments with new versions
     cmds:
       - uv lock --upgrade
-      - task: update-env
-
-  update:env:venv:
-    internal: true
-    cmds:
-      - echo "Updating Python {{.VERSION}} environment"
-      - uv pip install --python .venv-{{.VERSION}}/bin/python --upgrade pip
-      - uv pip install --python .venv-{{.VERSION}}/bin/python --upgrade -e ".[dev]"
-
-  update:dev-env:
-    desc: Update development environment with latest dependencies
-    summary: |
-      Update development environment with latest dependencies
-
-      Examples:
-        # Update only the development environment (Python {{.DEV_VERSION}})
-        task update:dev-env
-    cmds:
-      - task: update:env:venv
-        vars:
-          VERSION: "{{.DEV_VERSION}}"
+      - task: update:env
 
   add:
     desc: Install a package using uv pip install

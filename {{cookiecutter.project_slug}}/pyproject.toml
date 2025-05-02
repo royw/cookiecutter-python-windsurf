@@ -33,6 +33,7 @@ dev = [
 ]
 
 docs = [
+    "mkdocs>=1.5.3",
     "mkdocs-material>=9.4.14",
     "mkdocstrings[python]>=0.24.0",
     "mkdocs-gen-files>=0.5.0",
@@ -40,8 +41,6 @@ docs = [
 ]
 
 [tool.ruff]
-select = ["E", "F", "I"]
-fixable = ["I"]
 target-version = "py{{ cookiecutter.python_version.replace('.', '') }}"
 
 [tool.ruff.lint]
@@ -74,6 +73,13 @@ select = [
     "PL",  # pylint
     "TRY", # tryceratops
     "RUF", # ruff-specific rules
+]
+ignore = [
+  "PLR09",    # Too many <...>
+  "PLR2004",  # Magic value used in comparison
+  "ISC001",   # Conflicts with formatter
+  "S101",     # pytest uses "assert" so allow it
+  "N817",     # CamelCase imports
 ]
 
 [tool.ruff.format]
