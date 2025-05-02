@@ -17,6 +17,31 @@ pip install {{ cookiecutter.project_slug }}
 
 This project uses [Task](https://taskfile.dev) for task automation and GitHub Actions for CI/CD.
 
+### Python Version Management
+
+This project supports multiple Python versions using [uv](https://github.com/astral-sh/uv) for dependency management. Python versions are configured in two files:
+
+- `.python-versions` - List of supported Python versions
+- `.python-version` - Default Python version for development
+
+Each Python version has its own virtual environment (`.venv-X.Y`), and `.venv` symlinks to the default version's environment.
+
+#### Managing Python Versions
+
+```bash
+# List installed Python versions (* marks default)
+task python:list-installed
+
+# Add a Python version
+task python:add -- 3.11
+
+# Set default Python version
+task python:set-default -- 3.11
+
+# Remove a Python version
+task python:remove -- 3.11
+```
+
 ### Setup
 
 ```bash
@@ -24,23 +49,24 @@ task setup
 ```
 
 This will:
-1. Install required Python versions (3.11, 3.12, 3.13)
+1. Install all Python versions listed in `.python-versions`
 2. Create virtual environments for each Python version
-3. Install the package in editable mode with development and documentation dependencies
+3. Install the package in editable mode with all dependencies
 4. Set up pre-commit hooks
-5. Create a symlink from `.venv` to the development Python version (3.12)
+5. Create `.venv` symlink to the default Python version
 
 ### Available Tasks
 
 #### Environment Management
-- `task setup` - Set up development environments for all supported Python versions
-- `task update:env` - Update all virtual environments with latest dependencies
-- `task update:dev-env` - Update only development environment
-- `task upgrade-env` - Upgrade all dependencies to latest versions
+- `task setup` - Set up development environments
+- `task update:env` - Update all virtual environments
+- `task update:dev-env` - Update only default environment
+- `task upgrade-env` - Upgrade all dependencies
 - `task clean` - Clean build artifacts and caches
+- `task clean:venvs` - Remove all virtual environments
 
 #### Testing
-- `task test` - Run tests using development Python version
+- `task test` - Run tests using default Python version
 - `task test:coverage` - Run tests with coverage report
 - `task test:pythons` - Run tests across all supported Python versions
 

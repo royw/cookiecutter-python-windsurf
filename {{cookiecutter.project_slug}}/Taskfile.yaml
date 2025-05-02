@@ -1,17 +1,23 @@
-# Taskfile for the project
-# https://taskfile.dev
-#
 # This Taskfile provides commands for managing the project.
 #
+# This project uses Task (https://taskfile.dev) for task automation.
+#
 # Python Version Management:
-# The project supports multiple Python versions (3.11, 3.12, 3.13) with the following setup:
-# - DEV_VERSION (3.12) is the primary development version
-# - Virtual environments are created for each version (.venv-3.11, .venv-3.12, .venv-3.13)
-# - .venv symlink points to the development version's environment
+# - Uses uv (https://github.com/astral-sh/uv) for dependency management
+# - Supported Python versions are listed in .python-versions
+# - Default Python version is set in .python-version
+# - Each Python version has its own virtual environment (.venv-X.Y)
+# - .venv symlink points to the default version's environment
 # - Tasks should always use .venv/bin/python except when managing environments
 #
-# Environment:
-# - task setup: Set up development environments (creates all Python version environments)
+# Available Commands:
+# 1. Add a version:    task python:add -- 3.11
+# 2. List versions:    task python:list-installed
+# 3. Set default:      task python:set-default -- 3.11
+# 4. Remove version:   task python:remove -- 3.11
+#
+# Development Environment:
+# - task setup: Set up development environment
 # - task update:env: Update all virtual environments with latest dependencies
 # - task update:dev-env: Update only development environment
 # - task upgrade-env: Upgrade all dependencies to latest versions
@@ -43,18 +49,27 @@
 version: '3'
 
 vars:
-  # Default Python interpreter command
-  PYTHON: python3
   # Minimum required test coverage percentage
   COVERAGE_MIN: 80
-  # Primary development Python version
-  DEV_VERSION: "3.12"
+  # Primary development Python version from .python-version
+  DEV_VERSION:
+    sh: cat .python-version
+  # Space-separated list of supported Python versions from .python-versions
+  PYTHON_VERSIONS:
+    sh: cat .python-versions | tr '\n' ' ' | sed 's/ $//'  # Convert newlines to spaces and trim trailing space
   # Path to development virtual environment
   DEV_VENV: .venv-{{.DEV_VERSION}}
-  # Space-separated list of supported Python versions
-  PYTHON_VERSIONS: "3.11 3.12 3.13"
 
 tasks:
+  # Internal tasks
+  check:venv:
+    internal: true
+    silent: true
+    status:
+      - test -d .venv
+    cmds:
+      - task: setup
+
   # Core tasks
   default:
     desc: Show available tasks
@@ -79,6 +94,8 @@ tasks:
       Examples:
         # Run all CI checks
         task ci
+    deps:
+      - check:venv
     cmds:
       - task: lint
       - task: metrics
@@ -95,18 +112,170 @@ tasks:
       Examples:
         # Set up all environments
         task setup
+    silent: true
     cmds:
       - uv python install {{.PYTHON_VERSIONS}}
       - for: { var: PYTHON_VERSIONS }
         task: setup:venv
         vars:
           VERSION: "{{.ITEM}}"
-      - rm -f .venv
-      - ln -s {{.DEV_VENV}} .venv
+      - task: python:list-installed
+      - task: python:update-venv
       - pre-commit install
+
+  python:list-installed:
+    desc: List installed Python versions
+    summary: |
+      List installed Python versions
+
+      Examples:
+        # List installed Python versions
+        task python:list-installed
+
+        # Output example:
+        3.10
+        3.11
+        3.12 (default)
+        3.13
+        3.8
+    silent: true
+    cmds:
+      - |
+        echo "Installed Python versions:"
+        DEV_VER=$(cat .python-version)
+        uv python list --only-installed | grep -o '.*/python[0-9]\+\.[0-9]\+' | \
+        sed -E 's|.*/python([0-9]+\.[0-9]+).*|\1|' | sort -u | \
+        while read ver; do \
+          if [ "$ver" = "$DEV_VER" ]; then
+            echo "$ver (default)"
+          else
+            echo "$ver"
+          fi
+        done
+
+  python:update-venv:
+    internal: true
+    desc: Update virtual environment symlink to match .python-version
+    summary: |
+      Internal task to update the .venv symlink to point to the current default Python version's environment.
+      This task is called by other tasks that modify the default Python version.
+    silent: true
+    cmds:
+      - |
+        VER=$(cat .python-version)
+        rm -f .venv
+        ln -s .venv-$VER .venv
+        echo "Updated .venv to use Python $VER"
+
+  python:set-default:
+    desc: Set the default Python version
+    summary: |
+      Set the default Python version in .python-version
+
+      Examples:
+        # Set Python 3.11 as default
+        task python:set-default -- 3.11
+
+        # This will:
+        # 1. Check if the version is installed
+        # 2. Check if the version is in .python-versions
+        # 3. Update .python-version
+        # 4. Update the .venv symlink
+    silent: true
+    cmds:
+      - |
+        VER="{{.CLI_ARGS}}"
+        if ! uv python list --only-installed | grep -q "/python$VER"; then
+          echo "Error: Python $VER is not installed"
+          exit 1
+        fi
+        if ! grep -q "^$VER$" .python-versions; then
+          echo "Error: Python $VER is not in .python-versions"
+          exit 1
+        fi
+        echo "$VER" > .python-version
+        echo "Set Python $VER as default"
+      - task: python:update-venv
+
+  python:add:
+    desc: Add a Python version to .python-versions
+    summary: |
+      Add a Python version to .python-versions and install it
+
+      Examples:
+        # Add Python 3.11
+        task python:add -- 3.11
+
+        # Add multiple versions
+        task python:add -- 3.11 3.12 3.13
+    silent: true
+    cmds:
+      - |
+        for ver in {{.CLI_ARGS}}; do
+          if ! grep -q "^$ver$" .python-versions; then
+            echo "Adding Python $ver..."
+            echo "$ver" >> .python-versions
+            sort -u -o .python-versions .python-versions
+            uv python install "$ver"
+          else
+            echo "Python $ver already in .python-versions"
+          fi
+        done
+      - task: update:env
+
+  python:remove:
+    desc: Remove Python versions and their environments
+    summary: |
+      Remove Python versions from .python-versions and delete their virtual environments
+
+      Examples:
+        # Remove Python 3.11
+        task python:remove -- 3.11
+
+        # Remove multiple versions
+        task python:remove -- 3.11 3.12
+
+        # This will:
+        # 1. Remove versions from .python-versions
+        # 2. Delete their .venv-X.Y directories
+        # 3. If removing the default version, prompt to set a new one
+    silent: true
+    cmds:
+      - |
+        DEV_VER=$(cat .python-version)
+        NEED_NEW_DEFAULT=false
+
+        for ver in {{.CLI_ARGS}}; do
+          if grep -q "^$ver$" .python-versions; then
+            echo "Removing Python $ver..."
+            sed -i "/^$ver$/d" .python-versions
+            if [ -d ".venv-$ver" ]; then
+              rm -rf ".venv-$ver"
+              echo "Removed .venv-$ver directory"
+            fi
+            if [ "$ver" = "$DEV_VER" ]; then
+              NEED_NEW_DEFAULT=true
+            fi
+          else
+            echo "Python $ver not in .python-versions"
+          fi
+        done
+
+        if [ "$NEED_NEW_DEFAULT" = "true" ]; then
+          NEW_VER=$(head -n 1 .python-versions)
+          if [ -n "$NEW_VER" ]; then
+            echo "$NEW_VER" > .python-version
+            echo "Set Python $NEW_VER as new default version"
+            task python:update-venv
+          else
+            echo "Error: No Python versions left in .python-versions"
+            exit 1
+          fi
+        fi
 
   setup:venv:
     internal: true
+    silent: true
     cmds:
       - echo "Setting up Python {{.VERSION}} environment"
       - uv venv --python-preference managed --python {{.VERSION}} .venv-{{.VERSION}}
@@ -120,6 +289,7 @@ tasks:
       Examples:
         # Update all Python environments
         task update:env
+    silent: true
     cmds:
       - for: { var: PYTHON_VERSIONS }
         task: update:env:venv
@@ -129,6 +299,9 @@ tasks:
 
   update:env:venv:
     internal: true
+    silent: true
+    deps:
+      - check:venv
     cmds:
       - echo "Updating Python {{.VERSION}} environment"
       - uv pip install --python .venv-{{.VERSION}}/bin/python --upgrade pip
@@ -142,6 +315,7 @@ tasks:
       Examples:
         # Update only the development environment (Python {{.DEV_VERSION}})
         task update:dev-env
+    silent: true
     cmds:
       - task: update:env:venv
         vars:
@@ -159,6 +333,7 @@ tasks:
         # This will:
         # 1. Upgrade dependency versions in requirements.txt
         # 2. Update all Python environments with new versions
+    silent: true
     cmds:
       - uv lock --upgrade
       - task: update:env
@@ -182,6 +357,8 @@ tasks:
         task add -- requests pytest black
 
         # The double dash (--) is needed to separate the task's arguments from the package specifications.
+    deps:
+      - check:venv
     cmds:
       - uv pip install --python .venv/bin/python {{.CLI_ARGS}}
       - task: update-env
@@ -194,6 +371,7 @@ tasks:
       Examples:
         # Remove all build artifacts and caches
         task clean
+    silent: true
     cmds:
       - rm -rf build dist .eggs *.egg-info
       - find . -type d -name __pycache__ -exec rm -rf {} +
@@ -202,8 +380,7 @@ tasks:
       - find . -type d -name .mypy_cache -exec rm -rf {} +
       - find . -type f -name .coverage -delete
       - find . -type d -name htmlcov -exec rm -rf {} +
-      - for: { var: PYTHON_VERSIONS }
-        cmd: rm -rf .venv-{{.ITEM}}
+      - task: clean:venvs
 
   clean:venvs:
     desc: Remove all virtual environments
@@ -213,6 +390,7 @@ tasks:
       Examples:
         # Remove all virtual environments
         task clean:venvs
+    silent: true
     cmds:
       - rm -rf .venv
       - for: { var: PYTHON_VERSIONS }
@@ -235,6 +413,8 @@ tasks:
         task test -- -v -k "test_function"
 
         # The double dash (--) is needed to separate the task's arguments from the pytest options.
+    deps:
+      - check:venv
     cmds:
       - uv run --python .venv/bin/python pytest {{.CLI_ARGS}}
 
@@ -251,6 +431,9 @@ tasks:
         # - Run tests with coverage tracking
         # - Show missing lines in coverage report
         # - Fail if coverage is below 80%
+    silent: true
+    deps:
+      - check:venv
     cmds:
       - uv run --python .venv/bin/python pytest -vv --cov --cov-report=term-missing
       - .venv/bin/python -c "import sys; exit(1) if float('{{.COVERAGE_MIN}}') > float('$(uv run --python .venv/bin/python coverage report | grep TOTAL | awk '{print $4}' | tr -d '%')') else exit(0)"
@@ -263,6 +446,8 @@ tasks:
       Examples:
         # Test across all Python versions
         task test:pythons
+    deps:
+      - check:venv
     cmds:
       - for: { var: PYTHON_VERSIONS }
         task: test:python
@@ -271,6 +456,8 @@ tasks:
 
   test:python:
     internal: true
+    deps:
+      - check:venv
     cmds:
       - echo "Testing with Python {{.VERSION}}"
       # Run tests
@@ -287,6 +474,8 @@ tasks:
       Examples:
         # Run all pre-commit hooks
         task pre-commit
+    deps:
+      - check:venv
     cmds:
       - uv run --python .venv/bin/python pre-commit run --all-files
 
@@ -305,6 +494,9 @@ tasks:
         # - task lint:mypy
         # - task spell
         # - task deadcode
+    silent: true
+    deps:
+      - check:venv
     cmds:
       - task: pre-commit
       - task: lint:ruff
@@ -325,6 +517,8 @@ tasks:
         # - Unused functions and classes
         # - Unused imports
         # - Dead code blocks
+    deps:
+      - check:venv
     cmds:
       - uv run --python .venv/bin/python deadcode --dry src
 
@@ -341,6 +535,8 @@ tasks:
         # - Style violations (PEP 8)
         # - Common programming errors
         # - Code complexity
+    deps:
+      - check:venv
     cmds:
       - uv run --python .venv/bin/python ruff check src tests
 
@@ -357,6 +553,8 @@ tasks:
         # - Type annotations
         # - Type consistency
         # - Type safety
+    deps:
+      - check:venv
     cmds:
       - uv run --python .venv/bin/python mypy src tests
 
@@ -374,6 +572,8 @@ tasks:
         # - Test files
         # - Documentation files
         # - README.md
+    deps:
+      - check:venv
     cmds:
       - uv run --python .venv/bin/python codespell src tests docs README.md
 
@@ -391,6 +591,8 @@ tasks:
         # - Sort imports
         # - Apply consistent formatting
         # - Format both source and test files
+    deps:
+      - check:venv
     cmds:
       - uv run --python .venv/bin/python ruff format src tests
 
@@ -409,6 +611,8 @@ tasks:
         # - Raw metrics (LOC, SLOC)
         #
         # Note: Code should maintain cyclomatic complexity below 5
+    deps:
+      - check:venv
     cmds:
       - uv run --python .venv/bin/python radon cc src
 
@@ -424,6 +628,8 @@ tasks:
 
         # After starting, visit http://127.0.0.1:8000 in your browser
         # Press Ctrl+C to stop the server
+    deps:
+      - check:venv
     cmds:
       - task: docs:build
       - uv run --python .venv/bin/python mkdocs serve
@@ -438,6 +644,8 @@ tasks:
         task docs:build
 
         # The built documentation will be in the site/ directory
+    deps:
+      - check:venv
     cmds:
       - uv run --python .venv/bin/python mkdocs build
 
@@ -454,22 +662,12 @@ tasks:
         # Press Ctrl+C to stop the server
 
         # Note: Use task docs if you want to build and serve in one step
+    deps:
+      - check:venv
     cmds:
       - uv run --python .venv/bin/python mkdocs serve
 
   # Building
-  build:
-    desc: Build package distribution
-    summary: |
-      Build package distribution (both wheel and sdist)
-
-      Examples:
-        # Build all distribution formats
-        task build
-    cmds:
-      - rm -rf dist/
-      - task: build:wheel
-      - task: build:sdist
 
   build:wheel:
     desc: Build wheel distribution
@@ -479,6 +677,8 @@ tasks:
       Examples:
         # Build wheel package
         task build:wheel
+    deps:
+      - check:venv
     cmds:
       - uv run .venv/bin/python -m build --wheel
 
@@ -490,8 +690,25 @@ tasks:
       Examples:
         # Build source package
         task build:sdist
+    deps:
+      - check:venv
     cmds:
       - uv run .venv/bin/python -m build --sdist
+
+  build:
+    desc: Build package distribution
+    summary: |
+      Build package distribution (both wheel and sdist)
+
+      Examples:
+        # Build all distribution formats
+        task build
+    deps:
+      - check:venv
+    cmds:
+      - rm -rf dist/
+      - task: build:wheel
+      - task: build:sdist
 
   # Version management
   version:
@@ -501,6 +718,9 @@ tasks:
 
       Example:
         task version
+    silent: true
+    deps:
+      - check:venv
     cmds:
       - |
         VERSION=$(uv run .venv/bin/python -c "import tomli; print(tomli.load(open('pyproject.toml', 'rb'))['project']['version'])")
@@ -514,6 +734,9 @@ tasks:
       Examples:
         # Bump patch version
         task version:bump
+    silent: true
+    deps:
+      - check:venv
     cmds:
       - uv run .venv/bin/version_bumper bump patch
 
@@ -525,6 +748,9 @@ tasks:
 
       Example:
         task version:tag
+    silent: true
+    deps:
+      - check:venv
     cmds:
       - |
         VERSION=$(uv run .venv/bin/python -c "import tomli; print(tomli.load(open('pyproject.toml', 'rb'))['project']['version'])")
@@ -543,7 +769,8 @@ tasks:
       Examples:
         # Publish to TestPyPI
         task publish-test-pypi
-    deps: [build]
+    deps:
+      - build
     preconditions:
       - sh: test -f ~/.pypirc
         msg: "~/.pypirc file not found"
@@ -564,7 +791,8 @@ tasks:
       Examples:
         # Publish to PyPI
         task publish-pypi
-    deps: [build]
+    deps:
+      - build
     preconditions:
       - sh: test -f ~/.pypirc
         msg: "~/.pypirc file not found"
