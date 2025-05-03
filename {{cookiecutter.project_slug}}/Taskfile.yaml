@@ -1,27 +1,30 @@
 # This Taskfile provides commands for managing the project.
 #
 # This project uses Task (https://taskfile.dev) for task automation.
+# Uses uv (https://github.com/astral-sh/uv) for project management
 #
 # Python Version Management:
-# - Uses uv (https://github.com/astral-sh/uv) for dependency management
 # - Supported Python versions are listed in .python-versions
 # - Default Python version is set in .python-version
 # - Each Python version has its own virtual environment (.venv-X.Y)
 # - .venv symlink points to the default version's environment
 # - Tasks should always use .venv/bin/python except when managing environments
-#
-# Available Commands:
+# - Available Commands:
 # 1. Add a version:    task python:add -- 3.11
 # 2. List versions:    task python:list-installed
 # 3. Set default:      task python:set-default -- 3.11
 # 4. Remove version:   task python:remove -- 3.11
 #
-# Development Environment:
+# Package Management:
+# - task add: Install packages using uv add
+# - task remove: Remove packages using uv remove
+#
+# Virtual Environment Management:
 # - task setup: Set up development environment
-# - task update:env: Update all virtual environments with latest dependencies
-# - task update:dev-env: Update only development environment
-# - task upgrade-env: Upgrade all dependencies to latest versions
-# - task clean: Clean build artifacts and caches
+# - task venvs:update: Update all virtual environments
+# - task venvs:update:dev: Update only development environment
+# - task venvs:upgrade: Upgrade all dependencies to latest versions
+# - task venvs:clean: Remove all virtual environments
 #
 # Testing:
 # - task test: Run tests using development Python version
@@ -29,9 +32,12 @@
 # - task test:pythons: Run tests across all supported Python versions
 #
 # Code Quality:
-# - task lint: Run code quality checks (ruff, mypy, pre-commit)
+# - task lint: Run all code quality checks
+# - task lint:ruff: Run ruff linter
+# - task lint:mypy: Run mypy type checker
+# - task lint:deadcode: Check for unused code
 # - task format: Format code with ruff
-# - task metrics: Run code quality metrics (radon)
+# - task metrics: Run code quality metrics
 # - task spell: Run codespell checks
 #
 # Documentation:
@@ -105,6 +111,7 @@ tasks:
 
   # Environment management
   setup:
+    internal: true
     desc: Set up development environment
     summary: |
       Set up development environment (creates virtual environments for all Python versions)
@@ -200,7 +207,7 @@ tasks:
   python:add:
     desc: Add a Python version to .python-versions
     summary: |
-      Add a Python version to .python-versions and install it
+      Add Python versions using uv python install (https://docs.astral.sh/uv/commands/python/)
 
       Examples:
         # Add Python 3.11
@@ -221,7 +228,7 @@ tasks:
             echo "Python $ver already in .python-versions"
           fi
         done
-      - task: update:env
+      - task: venvs:update
 
   python:remove:
     desc: Remove Python versions and their environments
@@ -276,28 +283,31 @@ tasks:
   setup:venv:
     internal: true
     silent: true
+    desc: Create a virtual environment using uv venv
+    summary: |
+      Create a virtual environment using uv venv (https://docs.astral.sh/uv/commands/venv/)
     cmds:
       - echo "Setting up Python {{.VERSION}} environment"
       - uv venv --python-preference managed --python {{.VERSION}} .venv-{{.VERSION}}
       - uv pip install --python .venv-{{.VERSION}}/bin/python -e ".[dev,docs]"
 
-  update:env:
+  venvs:update:
     desc: Update virtual environment with latest dependencies
     summary: |
-      Update virtual environment with latest dependencies
+      Update virtual environment with latest dependencies using uv pip install (https://docs.astral.sh/uv/commands/pip/)
 
       Examples:
         # Update all Python environments
-        task update:env
+        task venvs:update
     silent: true
     cmds:
       - for: { var: PYTHON_VERSIONS }
-        task: update:env:venv
+        task: venvs:update:internal
         vars:
           VERSION: "{{.ITEM}}"
       - pre-commit install
 
-  update:env:venv:
+  venvs:update:internal:
     internal: true
     silent: true
     deps:
@@ -307,28 +317,28 @@ tasks:
       - uv pip install --python .venv-{{.VERSION}}/bin/python --upgrade pip
       - uv pip install --python .venv-{{.VERSION}}/bin/python --upgrade -e ".[dev,docs]"
 
-  update:dev-env:
+  venvs:update:dev:
     desc: Update development environment with latest dependencies
     summary: |
       Update development environment with latest dependencies
 
       Examples:
         # Update only the development environment (Python {{.DEV_VERSION}})
-        task update:dev-env
+        task venvs:update:dev
     silent: true
     cmds:
-      - task: update:env:venv
+      - task: venvs:update:internal
         vars:
           VERSION: "{{.DEV_VERSION}}"
 
-  upgrade-env:
+  venvs:upgrade:
     desc: Upgrade all dependencies to latest versions
     summary: |
-      Upgrade all dependencies to their latest versions and update environments
+      Upgrade all dependencies using uv lock (https://docs.astral.sh/uv/commands/lock/)
 
       Examples:
         # Upgrade all dependencies
-        task upgrade-env
+        task venvs:upgrade
 
         # This will:
         # 1. Upgrade dependency versions in requirements.txt
@@ -336,12 +346,12 @@ tasks:
     silent: true
     cmds:
       - uv lock --upgrade
-      - task: update:env
+      - task: venvs:update
 
   add:
-    desc: Install a package using uv pip install
+    desc: Install a package using uv add
     summary: |
-      Install a package using uv pip install
+      Install a package using uv add (https://docs.astral.sh/uv/commands/add/)
 
       Examples:
         # Install a single package
@@ -360,8 +370,27 @@ tasks:
     deps:
       - check:venv
     cmds:
-      - uv pip install --python .venv/bin/python {{.CLI_ARGS}}
-      - task: update-env
+      - uv add --python .venv/bin/python {{.CLI_ARGS}}
+      - task: venvs:update
+
+  remove:
+    desc: Remove a package using uv remove
+    summary: |
+      Remove a package using uv remove (https://docs.astral.sh/uv/commands/remove/)
+
+      Examples:
+        # Remove a single package
+        task remove -- requests
+
+        # Remove multiple packages
+        task remove -- requests pytest black
+
+        # The double dash (--) is needed to separate the task's arguments from the package specifications.
+    deps:
+      - check:venv
+    cmds:
+      - uv remove --python .venv/bin/python {{.CLI_ARGS}}
+      - task: venvs:update
 
   clean:
     desc: Clean build artifacts and caches
@@ -380,9 +409,9 @@ tasks:
       - find . -type d -name .mypy_cache -exec rm -rf {} +
       - find . -type f -name .coverage -delete
       - find . -type d -name htmlcov -exec rm -rf {} +
-      - task: clean:venvs
+      - task: venvs:clean
 
-  clean:venvs:
+  venvs:clean:
     desc: Remove all virtual environments
     summary: |
       Remove all virtual environments
@@ -502,16 +531,16 @@ tasks:
       - task: lint:ruff
       - task: lint:mypy
       - task: spell
-      - task: deadcode
+      - task: lint:deadcode
 
-  deadcode:
+  lint:deadcode:
     desc: Check for unused code in the project
     summary: |
       Check for unused code in the project
 
       Examples:
         # Check for unused code (dry run)
-        task deadcode
+        task lint:deadcode
 
         # This checks for:
         # - Unused functions and classes
