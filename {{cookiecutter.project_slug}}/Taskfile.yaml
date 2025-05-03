@@ -57,14 +57,6 @@ version: '3'
 vars:
   # Minimum required test coverage percentage
   COVERAGE_MIN: 80
-  # Primary development Python version from .python-version
-  DEV_VERSION:
-    sh: cat .python-version
-  # Space-separated list of supported Python versions from .python-versions
-  PYTHON_VERSIONS:
-    sh: cat .python-versions | tr '\n' ' ' | sed 's/ $//'  # Convert newlines to spaces and trim trailing space
-  # Path to development virtual environment
-  DEV_VENV: .venv-{{.DEV_VERSION}}
 
 tasks:
   # Internal tasks
@@ -120,6 +112,10 @@ tasks:
         # Set up all environments
         task setup
     silent: true
+    vars:
+      # Space-separated list of supported Python versions from .python-versions
+      PYTHON_VERSIONS:
+        sh: cat .python-versions | tr '\n' ' ' | sed 's/ $//'  # Convert newlines to spaces and trim trailing space
     cmds:
       - uv python install {{.PYTHON_VERSIONS}}
       - for: { var: PYTHON_VERSIONS }
@@ -130,10 +126,33 @@ tasks:
       - task: python:update-venv
       - pre-commit install
 
+  python:list:
+    desc: List Python versions in the project
+    summary: |
+      List Python versions from .python-versions and mark the default version
+
+      Examples:
+        # List Python versions
+        task python:list
+    silent: true
+    vars:
+      DEFAULT_VERSION:
+        sh: cat .python-version
+    cmds:
+      - |
+        echo "Python versions:"
+        while IFS= read -r ver; do
+          if [ "$ver" = "{{.DEFAULT_VERSION}}" ]; then
+            echo "$ver (default)"
+          else
+            echo "$ver"
+          fi
+        done < .python-versions
+
   python:list-installed:
     desc: List installed Python versions
     summary: |
-      List installed Python versions
+      List Python versions installed in the system
 
       Examples:
         # List installed Python versions
@@ -228,7 +247,7 @@ tasks:
             echo "Python $ver already in .python-versions"
           fi
         done
-      - task: venvs:update
+      - task: setup
 
   python:remove:
     desc: Remove Python versions and their environments
@@ -300,6 +319,10 @@ tasks:
         # Update all Python environments
         task venvs:update
     silent: true
+    vars:
+      # Space-separated list of supported Python versions from .python-versions
+      PYTHON_VERSIONS:
+        sh: cat .python-versions | tr '\n' ' ' | sed 's/ $//'  # Convert newlines to spaces and trim trailing space
     cmds:
       - for: { var: PYTHON_VERSIONS }
         task: venvs:update:internal
@@ -323,9 +346,13 @@ tasks:
       Update development environment with latest dependencies
 
       Examples:
-        # Update only the development environment (Python {{.DEV_VERSION}})
+        # Update only the development environment
         task venvs:update:dev
     silent: true
+    vars:
+      # Primary development Python version from .python-version
+      DEV_VERSION:
+        sh: cat .python-version
     cmds:
       - task: venvs:update:internal
         vars:
@@ -420,6 +447,10 @@ tasks:
         # Remove all virtual environments
         task clean:venvs
     silent: true
+    vars:
+      # Space-separated list of supported Python versions from .python-versions
+      PYTHON_VERSIONS:
+        sh: cat .python-versions | tr '\n' ' ' | sed 's/ $//'  # Convert newlines to spaces and trim trailing space
     cmds:
       - rm -rf .venv
       - for: { var: PYTHON_VERSIONS }
@@ -477,6 +508,10 @@ tasks:
         task test:pythons
     deps:
       - check:venv
+    vars:
+      # Space-separated list of supported Python versions from .python-versions
+      PYTHON_VERSIONS:
+        sh: cat .python-versions | tr '\n' ' ' | sed 's/ $//'  # Convert newlines to spaces and trim trailing space
     cmds:
       - for: { var: PYTHON_VERSIONS }
         task: test:python
