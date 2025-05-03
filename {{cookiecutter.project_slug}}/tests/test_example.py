@@ -1,7 +1,6 @@
 """Tests for the example module."""
 
 import pytest
-from contextlib import suppress
 
 # Constants
 TEST_VALUE = 42

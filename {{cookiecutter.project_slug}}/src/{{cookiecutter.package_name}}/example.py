@@ -57,6 +57,7 @@ class Example:
             raise InvalidValueError
         return self.value * 2
 
+
 if __name__ == "__main__":
     example = Example("test", 42)
     print(example.process())  # noqa: T201

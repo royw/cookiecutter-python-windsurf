@@ -86,7 +86,7 @@ tasks:
         # List all available tasks
         task
         # or
-        task --list-all --sort alphanumeric 
+        task --list-all --sort alphanumeric
     cmds:
       - task --list-all --sort alphanumeric
     silent: true
