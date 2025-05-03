@@ -4,6 +4,8 @@ This module shows how to format docstrings for good documentation generation
 using Google style and mkdocstrings.
 """
 
+from __future__ import annotations
+
 from typing import Any
 
 
@@ -56,8 +58,3 @@ class Example:
         if not self.value:
             raise InvalidValueError
         return self.value * 2
-
-
-if __name__ == "__main__":
-    example = Example("test", 42)
-    print(example.process())  # noqa: T201
