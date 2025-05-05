@@ -4,13 +4,13 @@ on:
   release:
     types: [published]
 
-
 jobs:
   release:
     runs-on: ubuntu-latest
     environment: release
     permissions:
       id-token: write
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -32,5 +32,27 @@ jobs:
         run: |
           python -m build
 
+      - name: Publish to Test PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          password: ${{ secrets.TEST_PYPI_TOKEN }}
+
+      - name: Test installation from Test PyPI
+        run: |
+          # Wait a bit for package to be available
+          sleep 30
+          # Create new venv for testing
+          python -m venv test_venv
+          source test_venv/bin/activate
+          # Install from Test PyPI
+          pip install --index-url https://test.pypi.org/simple/ \
+                      --extra-index-url https://pypi.org/simple \
+                      myrgb==${{ github.event.release.tag_name }}
+          # Basic import test
+          python -c "import myrgb; print(myrgb.__version__)"
+
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_TOKEN }}

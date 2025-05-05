@@ -56,7 +56,7 @@ version: '3'
 
 vars:
   # Minimum required test coverage percentage
-  COVERAGE_MIN: 80
+  COVERAGE_MIN: 80.0
 
 tasks:
   # Internal tasks
@@ -496,7 +496,43 @@ tasks:
       - check:venv
     cmds:
       - uv run --python .venv/bin/python pytest -vv --cov --cov-report=term-missing
-      - .venv/bin/python -c "import sys; exit(1) if float('{{.COVERAGE_MIN}}') > float('$(uv run --python .venv/bin/python coverage report | grep TOTAL | awk '{print $4}' | tr -d '%')') else exit(0)"
+      - .venv/bin/python -c "import sys; exit(1) if float('{{.COVERAGE_MIN}}') > float('$(uv run --python .venv/bin/python coverage report | grep TOTAL | awk '{print $6}' | tr -d '%')') else exit(0)"
+
+  test:github-actions:
+    desc: Run GitHub Actions tests locally using act
+    summary: |
+      Run GitHub Actions tests locally using act
+
+      Prerequisites:
+        1. Docker must be installed and running
+        2. act must be installed (https://github.com/nektos/act)
+        3. Docker user must have permissions to run containers
+           (user should be in the docker group or use sudo)
+
+      Examples:
+        # Run all GitHub Actions tests
+        task test:github-actions
+
+        # Run a specific job
+        task test:github-actions -- -j test
+        task test:github-actions -- -j type-check
+        task test:github-actions -- -j docs
+
+        # List available jobs
+        task test:github-actions -- -l
+
+        # The double dash (--) is needed to separate the task's arguments from the act options.
+    cmds:
+      - |
+        if [ -z "{{.CLI_ARGS}}" ]; then
+          # Run jobs sequentially when no specific job is specified
+          act -j test --container-architecture linux/amd64 -P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest && \
+          act -j type-check --container-architecture linux/amd64 -P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest && \
+          act -j docs --container-architecture linux/amd64 -P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest
+        else
+          # Run specific job(s) as specified in CLI_ARGS
+          act {{.CLI_ARGS}} --container-architecture linux/amd64 -P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest
+        fi
 
   test:pythons:
     desc: Run tests and checks across all Python versions
