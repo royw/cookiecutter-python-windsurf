@@ -567,17 +567,22 @@ tasks:
 
   # Code quality
   pre-commit:
-    desc: Run pre-commit hooks
+    desc: Run pre-commit hooks with one retry on failure
     summary: |
-      Run pre-commit hooks
+      Run pre-commit hooks. If the first run fails, it will retry once.
+      The task fails only if both attempts fail.
 
       Examples:
-        # Run all pre-commit hooks
+        # Run pre-commit hooks
         task pre-commit
     deps:
       - check:venv
     cmds:
-      - uv run --python .venv/bin/python pre-commit run --all-files
+      - cmd: |
+          .venv/bin/pre-commit run --all-files || {
+            echo "Pre-commit failed, retrying..."
+            .venv/bin/pre-commit run --all-files
+          }
 
   lint:
     desc: Run all code quality checks
