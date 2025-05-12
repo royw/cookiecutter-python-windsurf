@@ -7,6 +7,6 @@
     "github_username": "yourusername",
     "version": "0.1.0",
     "python_version": "3.11",
-    "keywords": ["PYTHON", "CLI"],
+    "keywords": "PYTHON CLI APPLICATION",
     "_copy_without_render": ["Taskfile.yaml"]
 }
