@@ -33,14 +33,10 @@ def main():
 
     print("\nProject {{ cookiecutter.project_name }} created successfully!")
     print("\nNext steps:")
-    print("1. Create and activate a virtual environment:")
-    print("   python -m venv .venv")
-    print("   source .venv/bin/activate  # Linux/macOS")
-    print("   .venv\\Scripts\\activate  # Windows")
-    print("\n2. Install dependencies:")
-    print("   pip install -e '.[dev,docs]'")
-    print("\n3. Initialize documentation:")
-    print("   task docs")
+    print("1. Change to the project directory:")
+    print("   cd {{ cookiecutter.project_slug }}")
+    print("\n2. Run CI tasks:")
+    print("   task ci")
 
 
 if __name__ == "__main__":

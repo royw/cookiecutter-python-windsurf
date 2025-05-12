@@ -23,7 +23,8 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "{{ cookiecutter.python_version }}"
+          python-version: |
+            {{ cookiecutter.python_version }}
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v1
@@ -43,10 +44,12 @@ jobs:
           uv run --python .venv/bin/python pytest tests/ --cov=src/ --cov-report=xml
 
       - name: Upload coverage to Codecov
-        if: ${{ github.actor != 'nektos/act' }}
+        if: |
+          {% raw %}${{ github.actor != 'nektos/act' }}{% endraw %}
         uses: codecov/codecov-action@v4
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          token: |
+            {% raw %}${{ secrets.CODECOV_TOKEN }}{% endraw %}
           file: ./coverage.xml
           fail_ci_if_error: true
 
@@ -59,7 +62,8 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "{{ cookiecutter.python_version }}"
+          python-version: |
+            {{ cookiecutter.python_version }}
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v1
@@ -84,7 +88,8 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "{{ cookiecutter.python_version }}"
+          python-version: |
+            {{ cookiecutter.python_version }}
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v1
@@ -101,8 +106,10 @@ jobs:
           uv run --python .venv/bin/python mkdocs build --strict
 
       - name: Deploy to GitHub Pages
-        if: {% raw %}${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor != 'nektos/act' }}{% endraw %}
+        if: |
+          {% raw %}${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor != 'nektos/act' }}{% endraw %}
         uses: peaceiris/actions-gh-pages@v3
         with:
-          github_token: {% raw %}${{ github.token }}{% endraw %}
+          github_token: |
+            {% raw %}${{ github.token }}{% endraw %}
           publish_dir: ./site

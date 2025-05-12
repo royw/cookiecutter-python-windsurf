@@ -7,7 +7,6 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
-    environment: release
     permissions:
       id-token: write
       contents: read
@@ -18,7 +17,8 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "{{ cookiecutter.python_version }}"
+          python-version: |
+            {{ cookiecutter.python_version }}
           cache: 'pip'
 
       - name: Set up uv
@@ -36,7 +36,8 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
-          password: ${{ secrets.TEST_PYPI_TOKEN }}
+          password: |
+            {% raw %}${{ secrets.TEST_PYPI_TOKEN }}{% endraw %}
 
       - name: Test installation from Test PyPI
         run: |
@@ -48,11 +49,12 @@ jobs:
           # Install from Test PyPI
           pip install --index-url https://test.pypi.org/simple/ \
                       --extra-index-url https://pypi.org/simple \
-                      myrgb==${{ github.event.release.tag_name }}
+                      {{ cookiecutter.project_slug }}=={% raw %}${{ github.event.release.tag_name }}{% endraw %}
           # Basic import test
-          python -c "import myrgb; print(myrgb.__version__)"
+          python -c "import {{ cookiecutter.project_slug }}; print({{ cookiecutter.project_slug }}.__version__)"
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          password: ${{ secrets.PYPI_TOKEN }}
+          password: |
+            {% raw %}${{ secrets.PYPI_TOKEN }}{% endraw %}
