@@ -7,7 +7,7 @@ name = "{{ cookiecutter.project_slug }}"
 version = "{{ cookiecutter.version }}"
 description = "{{ cookiecutter.project_short_description }}"
 readme = "README.md"
-requires-python = ">={{ cookiecutter.python_version }}"
+requires-python = ">={{ cookiecutter.supported_python_versions.split(", ")[0] }}"
 license = "MIT"
 authors = [
     { name = "{{ cookiecutter.full_name }}", email = "" },
@@ -17,28 +17,31 @@ maintainers = [
 ]
 
 keywords = [
-{% for keyword in cookiecutter.keywords %}    "{{ keyword }}"{% if not loop.last %},{% endif %}
+{% for keyword in cookiecutter.keywords.split(" ") %}    "{{ keyword }}"{% if not loop.last %},{% endif %}
 {% endfor %}]
 
-scripts = {'{{ cookiecutter.project_slug }}' = "{{ cookiecutter.project_slug }}.__main__:main"}
+scripts = {'{{ cookiecutter.package_name }}' = "{{ cookiecutter.package_name }}.__main__:main"}
 
 dependencies = []
 
 [project.optional-dependencies]
 dev = [
-    "ruff>=0.1.6",
+    "bandit>=1.8.3",
+    "build>=1.0.3",
+    "codespell>=2.2.6",
+    "deadcode>=1.0.0",
     "mypy>=1.7.0",
     "pytest>=7.4.3",
+    "pytest-benchmark>=4.0.0",
     "pytest-cov>=4.1.0",
+    "pytest-timeout>=2.4.0",
     "pre-commit>=3.5.0",
-    "uv>=0.1.0",
-    "build>=1.0.3",
-    "twine>=4.0.2",
-    "deadcode>=1.0.0",
-    "codespell>=2.2.6",
-    "radon>=6.0.1",
-    "version-bumper>=0.1.0",
+    "ruff>=0.1.6",
     "tomli>=2.0.1",
+    "twine>=4.0.2",
+    "radon>=6.0.1",
+    "uv>=0.1.0",
+    "version-bumper>=0.1.0",
 ]
 
 docs = [
@@ -50,15 +53,16 @@ docs = [
 ]
 
 [tool.coverage.run]
-source_pkgs = ["{{ cookiecutter.project_slug }}"]
+source_pkgs = ["{{ cookiecutter.package_name }}"]
 branch = true
 parallel = true
 omit = [
-  "{{ cookiecutter.project_slug }}/__init__.py",
+  "**/__init__.py",
+  "**/__main__.py"
 ]
 
 [tool.coverage.paths]
-source = ["{{ cookiecutter.project_slug }}"]
+source = ["{{ cookiecutter.package_name }}"]
 tests = ["tests"]
 
 [tool.coverage.report]
@@ -69,27 +73,49 @@ exclude_lines = [
 ]
 
 [tool.codespell]
-skip = '.git,*.pyc,*.pdf,*.svg'
+skip = '.git,*.pyc,*.pdf,*.svg,*.log'
 quiet-level = 3
-ignore-words-list = 'xyzzy'
+ignore-words-list = 'xyzzy,unparseable'
+
+[tool.deadcode]
+exclude = ["venv", "tests"]
+# ignore-names = ["entry_type", "errors"]
 
 [tool.hatch.build]
 packages = ["src/{{ cookiecutter.package_name }}"]
+include = ["src/{{ cookiecutter.package_name }}/py.typed"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/{{ cookiecutter.package_name }}"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"py.typed" = "{{ cookiecutter.package_name }}/py.typed"
 
 [tool.mypy]
-python_version = "{{ cookiecutter.python_version }}"
+python_version = "{{ cookiecutter.supported_python_versions.split(", ")[0] }}"
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = true
 check_untyped_defs = true
-disallow_any_unimported = true
-disallow_incomplete_defs = true
-disallow_untyped_decorators = true
 no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 warn_no_return = true
 warn_unreachable = true
+
+# Strict mode options
+strict = true
+show_error_codes = true
+ignore_missing_imports = false
+follow_imports = "normal"
+
+# Type checking rules
+disallow_untyped_defs = true
+disallow_any_unimported = true
+disallow_incomplete_defs = true
+disallow_untyped_globals = true
+disallow_untyped_calls = true
+disallow_any_generics = true
+disallow_untyped_decorators = true
 
 [tool.pytest.ini_options]
 minversion = "6.0"
@@ -111,11 +137,13 @@ filterwarnings = [
 log_cli_level = "INFO"
 pythonpath = "src"
 testpaths = [
-    "tests"
+    "tests/unit",
+    "tests/integration",
+    "tests/e2e",
 ]
 
 [tool.ruff]
-target-version = "py{{ cookiecutter.python_version.replace('.', '') }}"
+target-version = "py{{ cookiecutter.supported_python_versions.split(", ")[0].replace('.', '') }}"
 src = ["src", "tests"]
 extend-exclude = ["dist", "docs", "metrics", "scripts", "site", ".venv"]
 line-length = 119
@@ -188,6 +216,8 @@ extend-select = [
   #"FURB",     # refurb
   "RUF",      # Ruff-specific
 ]
+
+# Ignore specific rules
 ignore = [
   "PLR09",    # Too many <...>
   "PLR2004",  # Magic value used in comparison
@@ -195,13 +225,11 @@ ignore = [
   "S101",     # pytest uses "assert" so allow it
   "N817",     # CamelCase imports
 ]
+
+# Required imports for isort
 isort.required-imports = ["from __future__ import annotations"]
 # Uncomment if using a _compat.typing backport
 # typing-modules = ["scientific python._compat.typing"]
-
-[tool.ruff.lint.per-file-ignores]
-"tests/**" = ["T20"]
-"src/{{ cookiecutter.package_name }}/cli.py" = ["T201"]  # Allow print statements in CLI
 
 [tool.ruff.format]
 quote-style = "double"
@@ -209,3 +237,8 @@ indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
 docstring-code-format = true
+
+[dependency-groups]
+dev = [
+    "pytest-benchmark>=5.1.0",
+]

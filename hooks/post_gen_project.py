@@ -35,7 +35,11 @@ def main():
     print("\nNext steps:")
     print("1. Change to the project directory:")
     print("   cd {{ cookiecutter.project_slug }}")
-    print("\n2. Run CI tasks:")
+    print("2. Initialize your virtual environments (one for each python verions in .python-versions):")
+    print("   task setup")
+    print("3. Activate the development virtual environment (virtual environment using the python version specified in .python-version):")
+    print("   source .venv/bin/activate")
+    print("4. Run Continuous Integration (CI) tasks to verify everything is working:")
     print("   task ci")
 
 

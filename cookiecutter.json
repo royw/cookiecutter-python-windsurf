@@ -6,7 +6,8 @@
     "full_name": "Your Name",
     "github_username": "yourusername",
     "version": "0.1.0",
-    "python_version": "3.11",
+    "supported_python_versions": "3.11, 3.12, 3.13",
+    "development_python_version": "{{ cookiecutter.supported_python_versions.split(\", \")[0] }}",
     "keywords": "PYTHON CLI APPLICATION",
-    "_copy_without_render": ["Taskfile.yaml"]
+    "_copy_without_render": ["Taskfile.yaml", "py.typed", "scripts/*", "windsurfrules", ".windsurf/rules/*"]
 }

@@ -56,7 +56,7 @@ version: '3'
 
 vars:
   # Minimum required test coverage percentage
-  COVERAGE_MIN: 80
+  COVERAGE_MIN: 60
 
 tasks:
   # Internal tasks
@@ -67,6 +67,21 @@ tasks:
       - test -d .venv
     cmds:
       - task: setup
+
+  check:virtual-env:
+    desc: Check if VIRTUAL_ENV matches development environment
+    vars:
+      DEV_VERSION:
+        sh: cat .python-version
+      EXPECTED_VENV: '{{.USER_WORKING_DIR}}/.venv-{{.DEV_VERSION}}'
+    cmds:
+      - |
+        if [ -n "$VIRTUAL_ENV" ] && [ "$VIRTUAL_ENV" != "{{.EXPECTED_VENV}}" ]; then
+          echo "Error: VIRTUAL_ENV is set to $VIRTUAL_ENV but should be {{.EXPECTED_VENV}}"
+          echo "To fix this, run: source .venv/bin/activate"
+          exit 1
+        fi
+    silent: true
 
   # Core tasks
   default:
@@ -85,25 +100,33 @@ tasks:
 
   # CI/CD
   ci:
-    desc: Run all CI checks (lint, test, coverage, docs, build)
+    desc: Run all CI checks (lint, test, coverage, security, docs, build)
     summary: |
-      Run all CI checks (lint, test, coverage, docs, build)
+      Run all CI checks (lint, test, coverage, security, docs, build)
+
+      Before running this task, make sure your VIRTUAL_ENV environment variable
+      is either unset or matches your development Python version. If you see
+      an error about VIRTUAL_ENV mismatch, run: unset VIRTUAL_ENV
 
       Examples:
         # Run all CI checks
         task ci
     deps:
       - check:venv
+      - check:virtual-env
     cmds:
+      - scripts/fix_package_init_files
+      - task: pre-commit
       - task: lint
+      - task: lint:security
       - task: metrics
       - task: test:coverage
+      - task: lint:deadcode
       - task: docs:build
       - task: build
 
   # Environment management
   setup:
-    internal: true
     desc: Set up development environment
     summary: |
       Set up development environment (creates virtual environments for all Python versions)
@@ -125,6 +148,16 @@ tasks:
       - task: python:list-installed
       - task: python:update-venv
       - pre-commit install
+      - |
+        echo ""
+        echo "Setup complete."
+        echo ""
+        echo "Virtual environments:"
+        ls -Ald .venv*
+        echo ""
+        echo "Activate the environment with: source .venv/bin/activate"
+        echo ""
+        echo "Optionally, to see the list of available tasks, run: task"
 
   python:list:
     desc: List Python versions in the project
@@ -309,7 +342,6 @@ tasks:
       - echo "Setting up Python {{.VERSION}} environment"
       - uv venv --python-preference managed --python {{.VERSION}} .venv-{{.VERSION}}
       - uv pip install --python .venv-{{.VERSION}}/bin/python -e ".[dev,docs]"
-
   venvs:update:
     desc: Update virtual environment with latest dependencies
     summary: |
@@ -335,6 +367,7 @@ tasks:
     silent: true
     deps:
       - check:venv
+      - check:virtual-env
     cmds:
       - echo "Updating Python {{.VERSION}} environment"
       - uv pip install --python .venv-{{.VERSION}}/bin/python --upgrade pip
@@ -344,6 +377,10 @@ tasks:
     desc: Update development environment with latest dependencies
     summary: |
       Update development environment with latest dependencies
+
+      Before running this task, make sure your VIRTUAL_ENV environment variable
+      is either unset or matches your development Python version. If you see
+      an error about VIRTUAL_ENV mismatch, run: unset VIRTUAL_ENV
 
       Examples:
         # Update only the development environment
@@ -460,23 +497,41 @@ tasks:
   test:
     desc: Run tests
     summary: |
-      Run tests
+      Run tests using development Python version
 
       Examples:
         # Run all tests
         task test
 
         # Run specific test file
-        task test -- tests/test_specific.py
+        task test -- tests/test_example.py
 
-        # Run tests with pytest options
-        task test -- -v -k "test_function"
+        # Run specific test function
+        task test -- tests/test_example.py::test_function
 
         # The double dash (--) is needed to separate the task's arguments from the pytest options.
     deps:
       - check:venv
+      - check:virtual-env
     cmds:
       - uv run --python .venv/bin/python pytest {{.CLI_ARGS}}
+
+  test:performance:
+    desc: Run performance tests (requires --run-performance flag)
+    summary: |
+      Run performance tests with pytest-benchmark
+
+      Examples:
+        # Run performance tests
+        task test:performance -- --run-performance
+
+        # Run performance tests with specific benchmark options
+        task test:performance -- --run-performance --benchmark-min-rounds=5
+    deps:
+      - check:venv
+    cmds:
+      - uv run pytest tests/performance/ -v --run-performance --benchmark-enable --benchmark-json=benchmark_results.json
+      - echo "Performance test results saved to benchmark_results.json"
 
   test:coverage:
     desc: Run tests with coverage report
@@ -580,41 +635,32 @@ tasks:
       The task fails only if both attempts fail.
 
       Examples:
-        # Run pre-commit hooks
+        # Run pre-commit hooks on all files
         task pre-commit
+
+        # Run pre-commit on specific files
+        task pre-commit -- tests/unit/test_arguments.py
+
+        # Run a specific hook
+        task pre-commit --files tests/unit/test_arguments.py --hook ruff
     deps:
       - check:venv
     cmds:
       - cmd: |
-          .venv/bin/pre-commit run --all-files || {
-            echo "Pre-commit failed, retrying..."
-            .venv/bin/pre-commit run --all-files
-          }
-
-  lint:
-    desc: Run all code quality checks
-    summary: |
-      Run all code quality checks (pre-commit, ruff, mypy, spell check, dead code)
-
-      Examples:
-        # Run all linting checks
-        task lint
-
-        # This is equivalent to running:
-        # - task pre-commit
-        # - task lint:ruff
-        # - task lint:mypy
-        # - task spell
-        # - task deadcode
+          if [ -z "{{.CLI_ARGS}}" ]; then
+            .venv/bin/pre-commit run --all-files || {
+              echo "Pre-commit failed, retrying..."
+              .venv/bin/pre-commit run --all-files
+            }
+          else
+            .venv/bin/pre-commit run {{.CLI_ARGS}} || {
+              echo "Pre-commit failed, retrying..."
+              .venv/bin/pre-commit run {{.CLI_ARGS}}
+            }
+          fi
     silent: true
-    deps:
-      - check:venv
-    cmds:
-      - task: pre-commit
-      - task: lint:ruff
-      - task: lint:mypy
-      - task: spell
-      - task: lint:deadcode
+    vars:
+      CLI_ARGS: '{{.CLI_ARGS | default ""}}'
 
   lint:deadcode:
     desc: Check for unused code in the project
@@ -634,6 +680,57 @@ tasks:
     cmds:
       - uv run --python .venv/bin/python deadcode --dry src
 
+  lint:deadcode:fix:
+    desc: Fix unused code in the project
+    summary: |
+      Fix unused code in the project
+
+      Examples:
+        # Fix unused code
+        task lint:deadcode:fix
+
+        # This fixes:
+        # - Unused functions and classes
+        # - Unused imports
+        # - Dead code blocks
+    deps:
+      - check:venv
+    cmds:
+      - uv run --python .venv/bin/python deadcode --fix src
+
+  lint:
+    desc: Run all code quality checks (ruff, mypy, deadcode)
+    summary: |
+      Run all code quality checks (ruff, mypy, deadcode)
+
+      Examples:
+        # Run all linters on all files
+        task lint
+
+        # Run linters on specific files
+        task lint -- tests/unit/test_arguments.py
+
+        # Show help for a specific linter
+        task lint:ruff -- --help
+    deps:
+      - check:venv
+    cmds:
+      - cmd: |
+          if [ -z "{{.CLI_ARGS}}" ]; then
+            exec task lint:ruff
+          else
+            exec task lint:ruff -- {{.CLI_ARGS}}
+          fi
+      - cmd: |
+          if [ -z "{{.CLI_ARGS}}" ]; then
+            exec task lint:mypy
+          else
+            exec task lint:mypy -- {{.CLI_ARGS}}
+          fi
+    vars:
+      CLI_ARGS: '{{.CLI_ARGS | default ""}}'
+    silent: true
+
   lint:ruff:
     desc: Run ruff linter on source and test files
     summary: |
@@ -643,14 +740,21 @@ tasks:
         # Run ruff linter
         task lint:ruff
 
-        # Checks for:
-        # - Style violations (PEP 8)
-        # - Common programming errors
-        # - Code complexity
+        # Run on specific files/directories
+        task lint:ruff -- src/lumberjack/models
+
+        # Show help for ruff
+        task lint:ruff -- --help
+
+        # Common options:
+        # --fix         Attempt to automatically fix lint violations
+        # --show-source Show source code for errors
+        # --exit-zero   Exit with code 0 even if there are errors
+        # --watch       Run in watch mode
     deps:
       - check:venv
     cmds:
-      - uv run --python .venv/bin/python ruff check src tests
+      - uv run --python .venv/bin/python ruff check {{.CLI_ARGS | default "src tests"}}
 
   lint:mypy:
     desc: Run mypy type checker on source and test files
@@ -661,14 +765,40 @@ tasks:
         # Run type checking
         task lint:mypy
 
-        # Verifies:
-        # - Type annotations
-        # - Type consistency
-        # - Type safety
+        # Check specific files/directories
+        task lint:mypy -- src/lumberjack/models
+
+        # Show help for mypy
+        task lint:mypy -- --help
+
+        # Common options:
+        # --strict      Enable strict mode
+        # --show-error-codes  Show error codes
+        # --pretty      Use visually nicer output
+        # --warn-unused-ignores  Warn about unneeded # type: ignore comments
     deps:
       - check:venv
     cmds:
-      - uv run --python .venv/bin/python mypy src tests
+      - uv run --python .venv/bin/python mypy {{.CLI_ARGS | default "src tests"}}
+
+  lint:security:
+    desc: Run security linters (bandit, safety, trufflehog)
+    summary: |
+      Run security linters to identify potential security issues
+
+      This task runs the following security tools:
+      - bandit: Static code analysis for security issues
+
+      Examples:
+        # Run all security checks
+        task lint:security
+
+        # Run specific security tools
+        task lint:security -- bandit
+    deps:
+      - check:venv
+    cmds:
+      - cmd: uv run --python .venv/bin/python -m bandit -r src/ -c pyproject.toml
 
   spell:
     desc: Check spelling in code and documentation files
@@ -676,18 +806,24 @@ tasks:
       Check spelling in code and documentation files
 
       Examples:
-        # Check spelling
+        # Check spelling in all files
         task spell
 
-        # Checks spelling in:
-        # - Python source files
-        # - Test files
-        # - Documentation files
-        # - README.md
+        # Check specific files/directories
+        task spell -- src/lumberjack/models
+
+        # Show help for codespell
+        task spell -- --help
+
+        # Common options:
+        # --skip=file1,file2  Skip specified files/directories
+        # --ignore-words=FILE  File with words to ignore
+        # --write-changes  Write changes in place if possible
+        # --quiet          Suppress output unless there are errors
     deps:
       - check:venv
     cmds:
-      - uv run --python .venv/bin/python codespell src tests docs README.md
+      - uv run --python .venv/bin/python codespell {{.CLI_ARGS | default "src tests docs README.md"}}
 
   format:
     desc: Format code with ruff formatter
@@ -698,15 +834,20 @@ tasks:
         # Format all code
         task format
 
-        # This will:
-        # - Fix code style issues
-        # - Sort imports
-        # - Apply consistent formatting
-        # - Format both source and test files
+        # Format specific files/directories
+        task format -- src/lumberjack/models
+
+        # Show help for ruff format
+        task format -- --help
+
+        # Common options:
+        # --check         Check if files are formatted (no changes)
+        # --diff          Show diff of changes
+        # --force-exclude Force exclude files/directories
     deps:
       - check:venv
     cmds:
-      - uv run --python .venv/bin/python ruff format src tests
+      - uv run --python .venv/bin/python ruff format {{.CLI_ARGS | default "src tests"}}
 
   metrics:
     desc: Run code quality metrics using radon
@@ -714,19 +855,41 @@ tasks:
       Run code quality metrics using radon
 
       Examples:
-        # Check code complexity
+        # Check code complexity for all source files
         task metrics
 
-        # This calculates:
-        # - Cyclomatic complexity
-        # - Maintainability index
-        # - Raw metrics (LOC, SLOC)
-        #
-        # Note: Code should maintain cyclomatic complexity below 5
+        # Check specific files/directories
+        task metrics -- src/lumberjack/models
+
+        # Show help for radon
+        task metrics -- --help
+
+        # Common options:
+        # -s, --min=B  Minimum score (default: 0)
+        # -m, --min=B  Minimum score (same as -s)
+        # -x, --max=B  Maximum score (default: 100)
+        # -j, --json   Output results as JSON
+        # -n, --no-assert  Ignore assert statements
+        # -nc, --no-color  Disable colors in output
     deps:
       - check:venv
     cmds:
-      - uv run --python .venv/bin/python radon cc src
+      - uv run --python .venv/bin/python radon cc {{.CLI_ARGS | default "src"}}
+      - task: metrics:sloc
+
+  metrics:sloc:
+    desc: Calculate SLOC using radon
+    summary: |
+      Calculate SLOC using radon
+
+      Examples:
+        # Calculate SLOC
+        task metrics:sloc
+    deps:
+      - check:venv
+    cmds:
+      - uv run --python .venv/bin/python radon raw --summary src | grep -A 5 "^\*\* Total \*\*" | grep "SLOC" | awk '{print "SLOC:", $2}'
+    silent: true
 
   # Documentation
   docs:

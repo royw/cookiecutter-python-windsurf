@@ -1,1 +1,1 @@
-3.12
+{{ cookiecutter.development_python_version }}
