@@ -45,7 +45,7 @@
 # - task docs:build: Build documentation
 #
 # Build and Publish:
-# - task build: Build package distribution (wheel and sdist)
+# - task build: Build package distribution (source and binary)
 # - task publish:pypi: Publish to PyPI
 # - task publish:test-pypi: Publish to Test PyPI
 #
@@ -122,6 +122,7 @@ tasks:
       - task: metrics
       - task: test:coverage
       - task: lint:deadcode
+      - task: lint:techdebt
       - task: docs:build
       - task: build
 
@@ -130,6 +131,7 @@ tasks:
     desc: Set up development environment
     summary: |
       Set up development environment (creates virtual environments for all Python versions)
+      and ensures the .venv symlink points to the default version's environment.
 
       Examples:
         # Set up all environments
@@ -139,25 +141,48 @@ tasks:
       # Space-separated list of supported Python versions from .python-versions
       PYTHON_VERSIONS:
         sh: cat .python-versions | tr '\n' ' ' | sed 's/ $//'  # Convert newlines to spaces and trim trailing space
+      DEFAULT_VERSION:
+        sh: cat .python-version
     cmds:
+      # Clean up any existing virtual environments
+      - rm -rf .venv .venv-*
+
+      # Install required Python versions if not already installed
       - uv python install {{.PYTHON_VERSIONS}}
+
+      # Create virtual environments for each Python version
       - for: { var: PYTHON_VERSIONS }
         task: setup:venv
         vars:
           VERSION: "{{.ITEM}}"
-      - task: python:list-installed
-      - task: python:update-venv
+
+      # Update .venv symlink to point to the default version's environment
+      - ln -sfn .venv-{{.DEFAULT_VERSION}} .venv
+
+      # Install development dependencies in the default environment
+      - task: venvs:update:dev
+
+      # Install pre-commit hooks
       - pre-commit install
+
+      # Show setup summary
+      - task: python:list-installed
       - |
         echo ""
         echo "Setup complete."
         echo ""
         echo "Virtual environments:"
-        ls -Ald .venv*
+        ls -Ald .venv .venv-*
+        echo ""
+        echo "Default Python version: {{.DEFAULT_VERSION}}"
+        echo "Active virtual environment: $(readlink -f .venv)"
         echo ""
         echo "Activate the environment with: source .venv/bin/activate"
         echo ""
         echo "Optionally, to see the list of available tasks, run: task"
+        echo ""
+        echo "To switch Python versions, use: task python:set-default -- <version>"
+        echo "Available versions: {{.PYTHON_VERSIONS}}"
 
   python:list:
     desc: List Python versions in the project
@@ -222,8 +247,7 @@ tasks:
     cmds:
       - |
         VER=$(cat .python-version)
-        rm -f .venv
-        ln -s .venv-$VER .venv
+        ln -sf "{{.USER_WORKING_DIR}}/.venv-$VER" "{{.USER_WORKING_DIR}}/.venv"
         echo "Updated .venv to use Python $VER"
 
   python:set-default:
@@ -342,6 +366,7 @@ tasks:
       - echo "Setting up Python {{.VERSION}} environment"
       - uv venv --python-preference managed --python {{.VERSION}} .venv-{{.VERSION}}
       - uv pip install --python .venv-{{.VERSION}}/bin/python -e ".[dev,docs]"
+
   venvs:update:
     desc: Update virtual environment with latest dependencies
     summary: |
@@ -466,13 +491,16 @@ tasks:
         task clean
     silent: true
     cmds:
-      - rm -rf build dist .eggs *.egg-info
+      - find . -type d -name dist -exec rm -rf {} +
       - find . -type d -name __pycache__ -exec rm -rf {} +
       - find . -type d -name .pytest_cache -exec rm -rf {} +
       - find . -type d -name .ruff_cache -exec rm -rf {} +
       - find . -type d -name .mypy_cache -exec rm -rf {} +
       - find . -type f -name .coverage -delete
       - find . -type d -name htmlcov -exec rm -rf {} +
+      - find . -type d -name logs -exec rm -rf {} +
+      - find . -type d -name site -exec rm -rf {} +
+      - find ./docs -type d -name reference -exec rm -rf {} +
       - task: venvs:clean
 
   venvs:clean:
@@ -515,6 +543,48 @@ tasks:
       - check:virtual-env
     cmds:
       - uv run --python .venv/bin/python pytest {{.CLI_ARGS}}
+
+  test:unit:
+    desc: Run unit tests
+    summary: |
+      Run unit tests
+
+      Examples:
+        # Run all unit tests
+        task test:unit
+    deps:
+      - check:venv
+      - check:virtual-env
+    cmds:
+      - uv run --python .venv/bin/python pytest tests/unit {{.CLI_ARGS}}
+
+  test:integration:
+    desc: Run integration tests
+    summary: |
+      Run integration tests
+
+      Examples:
+        # Run all integration tests
+        task test:integration
+    deps:
+      - check:venv
+      - check:virtual-env
+    cmds:
+      - uv run --python .venv/bin/python pytest tests/integration {{.CLI_ARGS}}
+
+  test:e2e:
+    desc: Run end-to-end tests
+    summary: |
+      Run end-to-end tests
+
+      Examples:
+        # Run all end-to-end tests
+        task test:e2e
+    deps:
+      - check:venv
+      - check:virtual-env
+    cmds:
+      - uv run --python .venv/bin/python pytest tests/e2e {{.CLI_ARGS}}
 
   test:performance:
     desc: Run performance tests (requires --run-performance flag)
@@ -678,7 +748,7 @@ tasks:
     deps:
       - check:venv
     cmds:
-      - uv run --python .venv/bin/python deadcode --dry src
+      - uv run --python .venv/bin/python deadcode --dry src tests
 
   lint:deadcode:fix:
     desc: Fix unused code in the project
@@ -698,22 +768,79 @@ tasks:
     cmds:
       - uv run --python .venv/bin/python deadcode --fix src
 
-  lint:
-    desc: Run all code quality checks (ruff, mypy, deadcode)
+  lint:techdebt:
+    desc: Find technical debt in the codebase
     summary: |
-      Run all code quality checks (ruff, mypy, deadcode)
+      Scan the codebase for technical debt markers (TODO, FIXME, TBD, etc.)
 
       Examples:
-        # Run all linters on all files
-        task lint
+        # Find all technical debt in default locations (src/)
+        task lint:techdebt
 
-        # Run linters on specific files
-        task lint -- tests/unit/test_arguments.py
+        # Search specific directories
+        task lint:techdebt -- src/ tests/
 
-        # Show help for a specific linter
-        task lint:ruff -- --help
+
+        # Use custom markers (note the -- before the arguments)
+        task lint:techdebt -- --markers=TODO,FIXME,XXX
+
+        # Search specific directories with custom markers
+        task lint:techdebt -- --markers=TODO,FIXME src/ tests/
+
+
+        # Multiple arguments
+        task lint:techdebt -- --markers=TODO,FIXME --exclude=tests/
+
+
+      By default, searches for: TODO, FIXME, TBD, HACK, NOTE, BUG, WARNING, DEPRECATED
+      in the src/ directory.
     deps:
       - check:venv
+    cmds:
+      - chmod +x ./scripts/find-tech-debt.py
+      - ./scripts/find-tech-debt.py {{.CLI_ARGS}}
+    vars:
+      # Pass all arguments after -- to the script
+      # This requires using -- before the arguments to pass them through
+      # Example: task lint:techdebt -- --markers=TODO,FIXME src/
+      CLI_ARGS: '{{join " " .CLI_ARGS}}'
+
+  lint:tests:
+    desc: Verify no mocks, patches, or monkeypatching in test files
+    summary: |
+      Check test files for usage of mocks, patches, or monkeypatching
+      which are not allowed in this project.
+
+      Examples:
+        # Check for disallowed test patterns
+        task lint:tests
+    deps:
+      - check:venv
+    cmds:
+      - |
+        # Check for common mocking patterns
+        if grep -r --include="*.py" -lE '\b(unittest\.mock|patch|mocker|monkeypatch)\b' tests/; then
+          echo "Error: Found disallowed test patterns (mocks/patches/monkeypatching) in the above files"
+          echo "This project requires tests to use real implementations or dependency injection"
+          exit 1
+        fi
+      - |
+        # Check for pytest-mock usage
+        if grep -r --include="*.py" -lE '\bmocker\s*=|@pytest\.mark\.mocker\b' tests/; then
+          echo "Error: Found disallowed pytest-mock usage in the above files"
+          echo "This project requires tests to use real implementations or dependency injection"
+          exit 1
+        fi
+    silent: true
+
+  lint:
+    desc: Run all code quality checks
+    summary: |
+      Run all code quality checks (ruff, mypy, tests)
+
+      Examples:
+        # Run all linters
+        task lint
     cmds:
       - cmd: |
           if [ -z "{{.CLI_ARGS}}" ]; then
@@ -726,6 +853,25 @@ tasks:
             exec task lint:mypy
           else
             exec task lint:mypy -- {{.CLI_ARGS}}
+          fi
+      - cmd: |
+          if [ -z "{{.CLI_ARGS}}" ]; then
+            exec task lint:tests
+          else
+            # Skip lint:tests if specific files are provided
+            echo "Skipping test pattern check when specific files are provided"
+          fi
+      - cmd: |
+          echo "Checking for AI being bad..."
+          echo "  Checking for logger calls with string format arguments..."
+          if grep -rnE 'logger\\.(debug|info|warning|error|exception|critical)[^,]+%' src/**/*.py; then
+            echo "Error: Found logger calls with string format arguments. Use loguru's {} placeholder syntax instead (e.g., logger.debug('message: {}', value))"
+            exit 1
+          fi
+          echo "  Checking for import logging..."
+          if grep -rnE 'import logging' src/**/*.py; then
+            echo "Error: Found 'import logging'. Use 'from loguru import logger' instead."
+            exit 1
           fi
     vars:
       CLI_ARGS: '{{.CLI_ARGS | default ""}}'
@@ -798,7 +944,7 @@ tasks:
     deps:
       - check:venv
     cmds:
-      - cmd: uv run --python .venv/bin/python -m bandit -r src/ -c pyproject.toml
+      - cmd: uv run --python .venv/bin/python -m bandit --quiet -r src/ -c pyproject.toml
 
   spell:
     desc: Check spelling in code and documentation files
@@ -909,20 +1055,44 @@ tasks:
       - task: docs:build
       - uv run --python .venv/bin/python mkdocs serve
 
+  docs:markdown-nl-eof:
+    desc: Ensure markdown files end with a newline character (internal)
+    internal: true
+    cmds:
+      - |
+        echo "Ensuring markdown files end with newline..."
+        # Fix newlines in reference markdown files
+        find docs/reference -type f -name "*.md" | while read -r file; do
+          if [ -s "$file" ] && ! tail -c 1 "$file" | grep -q '^$'; then
+            echo >> "$file"
+          fi
+        done
+
+        # Also check site directory after build
+        find site -type f -name "*.md" | while read -r file; do
+          if [ -s "$file" ] && ! tail -c 1 "$file" | grep -q '^$'; then
+            echo >> "$file"
+          fi
+        done
+    silent: true
+
   docs:build:
     desc: Build documentation to site/ directory
     summary: |
-      Build documentation to site/ directory
-
-      Examples:
-        # Build documentation
-        task docs:build
-
-        # The built documentation will be in the site/ directory
+      Build the documentation site using MkDocs.
+      The built documentation will be in the site/ directory
     deps:
       - check:venv
     cmds:
-      - uv run --python .venv/bin/python mkdocs build
+      - echo "Building documentation..."
+      - echo "Building api reference..."
+      - uv run --python .venv/bin/python scripts/gen_ref_pages.py
+      - echo "Copying project files..."
+      - mkdir -p docs/project-files
+      - cp LICENSE README.md DEV-README.md kde-theme-colors-prompt.md docs/project-files/
+      - echo "Building site..."
+      - mkdocs build --strict --quiet
+      - task: docs:markdown-nl-eof
 
   docs:serve:
     desc: Serve documentation without rebuilding
@@ -943,47 +1113,19 @@ tasks:
       - uv run --python .venv/bin/python mkdocs serve
 
   # Building
-
-  build:wheel:
-    desc: Build wheel distribution
-    summary: |
-      Build wheel distribution
-
-      Examples:
-        # Build wheel package
-        task build:wheel
-    deps:
-      - check:venv
-    cmds:
-      - uv run .venv/bin/python -m build --wheel
-
-  build:sdist:
-    desc: Build source distribution
-    summary: |
-      Build source distribution
-
-      Examples:
-        # Build source package
-        task build:sdist
-    deps:
-      - check:venv
-    cmds:
-      - uv run .venv/bin/python -m build --sdist
-
   build:
-    desc: Build package distribution
+    desc: Build source + binary distributions
     summary: |
-      Build package distribution (both wheel and sdist)
+      Build source the source distribution from the source files,
+      then builds the binary distribution from the source distribution.
 
       Examples:
-        # Build all distribution formats
         task build
     deps:
       - check:venv
     cmds:
       - rm -rf dist/
-      - task: build:wheel
-      - task: build:sdist
+      - uv run .venv/bin/python -m build
 
   # Version management
   version:

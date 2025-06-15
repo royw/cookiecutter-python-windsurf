@@ -9,9 +9,12 @@ theme:
   features:
     - navigation.instant
     - navigation.tracking
+    - navigation.tabs
     - navigation.sections
     - navigation.expand
     - navigation.indexes
+    - navigation.sticky
+    - navigation.path
     - toc.follow
     - search.suggest
     - search.highlight
@@ -30,14 +33,22 @@ theme:
   icon:
     repo: fontawesome/brands/github
 
+strict: false  # Don't fail build for warnings like missing files
+
 plugins:
   - search
+  - git-revision-date-localized:
+      type: timeago
+      timezone: America/Chicago
+      locale: en
   - autorefs
   - gen-files:
       scripts:
         - scripts/gen_ref_pages.py
   - literate-nav:
       nav_file: SUMMARY.md
+  - mermaid2:
+      version: '11.6.0'
   - mkdocstrings:
       default_handler: python
       handlers:
@@ -61,7 +72,11 @@ markdown_extensions:
       pygments_lang_class: true
   - pymdownx.inlinehilite
   - pymdownx.snippets
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:mermaid2.fence_mermaid_custom
   - admonition
   - pymdownx.details
   - pymdownx.tabbed:
@@ -72,5 +87,18 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Architecture: architecture.md
   - API Reference: reference/
-  - Project Memories: project_memories.md
+
+  - Project Information:
+    - Project Overview (README.md): project-files/README.md
+    - Developer Guide (DEV-README.md): project-files/DEV-README.md
+    - Software Requirements Specification: software-requirements-specification.md
+    - Software Design Document: software-design-document.md
+    - Test Design Document: test-design-document.md
+    - Reference Cross Check: reference-cross-check.md
+
+  - Miscellany:
+    - Project Memories: project_memories.md
+    - Original AI Prompt: project-files/kde-theme-colors-prompt.md
+    - License: project-files/LICENSE

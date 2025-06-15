@@ -46,7 +46,7 @@ test_commit_order = true   # Tests must be committed before or with implementati
 test_naming = "test_${feature}_${scenario}"  # Naming convention for test files/functions
 refactor_after_green = true  # Must consider refactoring after each green state
 refactor_tests_first = true  # Must refactor tests before refactoring implementation
-    
+
 # Red-Green-Refactor Strategy
 require_red_green_cycle = true  # Must follow red-green-refactor cycle
 require_failing_test_first = true  # Must have a failing test before implementation

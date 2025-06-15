@@ -2,35 +2,21 @@
 
 {{ cookiecutter.project_short_description }}
 
-## Installation
+## Documentation
 
-```bash
-pip install {{ cookiecutter.project_slug }}
-```
+- [Project Overview](project-files/README.md) - Features and usage
+- [Developer Guide](project-files/DEV-README.md) - Setup and contribution
+- [Architecture](architecture.md) - System design and component relationships
+- [API Reference](reference/index.md) - Module and class documentation
 
-## Development
+## Project Information
 
-This project uses [Task](https://taskfile.dev) for task automation.
+- [Project Memories](project_memories.md) - Development decisions
+- [Original AI Prompt](project-files/kde-theme-colors-prompt.md) - Project origins
+- [License](license.md) - License information
 
-### Setup
+---
 
-```bash
-task setup
-```
+*Last updated: {% raw %} {{ git_revision_date_localized }} {% endraw %}*
 
-This will:
-1. Create a virtual environment
-2. Install the package in editable mode with development dependencies
-
-### Available Tasks
-
-- `task format` - Format code with black
-- `task lint` - Run linters (ruff)
-- `task typecheck` - Run type checking with mypy
-- `task test` - Run tests with pytest
-- `task docs` - Build and serve documentation
-- `task check` - Run all checks (format, lint, typecheck, test)
-
-## API Reference
-
-See the [API Reference](reference/) for detailed documentation of all modules and classes.
+*Built with [MkDocs](https://www.mkdocs.org/) and [Material for MkDocs](https://squidfunk.github.io/mkdocs-material/).*

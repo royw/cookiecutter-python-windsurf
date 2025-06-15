@@ -41,7 +41,17 @@ jobs:
       - name: Run tests
         run: |
           source .venv/bin/activate
-          uv run --python .venv/bin/python pytest tests/unit tests/integration tests/e2e --cov=src/ --cov-report=xml
+          # Set PYTHONPATH to include the src directory
+          export PYTHONPATH=$PYTHONPATH:$(pwd)/src
+          # Run pytest with coverage using the Python module syntax
+          python -m pytest tests/unit tests/integration tests/e2e \
+            --cov=src \
+            --cov-report=term \
+            --cov-report=xml:coverage.xml \
+            --cov-config=pyproject.toml
+
+          # Print coverage report
+          python -m coverage report
 
       # - name: Upload coverage to Codecov
       #   if: |
@@ -103,7 +113,17 @@ jobs:
       - name: Build docs
         run: |
           source .venv/bin/activate
-          uv run --python .venv/bin/python mkdocs build --strict
+          echo "Building documentation..."
+
+          echo "Building api reference..."
+          python scripts/gen_ref_pages.py
+
+          echo "Copying project files..."
+          mkdir -p docs/project-files
+          cp -v LICENSE README.md DEV-README.md kde-theme-colors-prompt.md docs/project-files/
+
+          echo "Building site..."
+          mkdocs build --strict
 
       - name: Deploy to GitHub Pages
         if: |
